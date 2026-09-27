@@ -29,6 +29,7 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
 .reel{position:relative;display:flex;flex-direction:column;gap:2px;padding:3px;border-radius:8px;min-width:0;background:linear-gradient(180deg,#1a1450,#0f0a35);border:2px solid #b8862b;box-shadow:0 0 8px rgba(184,134,43,.35);}
 .cell{width:100%;aspect-ratio:1/1;min-height:0;overflow:hidden;position:relative;border-radius:6px;font-size:30px;display:flex;align-items:center;justify-content:center;}
 .cell img{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain;}
+.cell img.sym-blank{inset:-34%;width:168%;height:168%;}
 .cell.win{background:rgba(61,220,151,.18);z-index:2;animation:winCelebrate 1s ease-in-out infinite;box-shadow:0 0 14px var(--gold2);}
 @keyframes winCelebrate{
   0%{transform:scale(1);}
@@ -40,29 +41,27 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
 .cell.win.wild-win{box-shadow:0 0 22px var(--gold2), 0 0 40px rgba(255,215,0,.6);}
 .cell.win.wild-win img{filter:drop-shadow(0 0 8px rgba(255,215,0,.9));}
 .badge{position:absolute;bottom:0;right:0;background:var(--gold2);color:#111;font-size:10px;font-weight:800;padding:0 4px;border-radius:6px;z-index:3;}
-/* ✅ تمدد الشجرة (Expanding Wild): طبقة فوق البكرة كلها، صورة وحدة كبيرة بدل ٣ خانات منفصلة */
 .expand-wild{
   position:absolute;inset:0;z-index:10;pointer-events:none;
   display:flex;align-items:center;justify-content:center;
-  overflow:visible;border-radius:8px;
-  background:rgba(255,215,0,.06);
+  overflow:hidden;border-radius:8px;
+  background:linear-gradient(180deg,#1a1450,#0f0a35);
   transform-origin:center;
   animation:expandWildBurst .6s cubic-bezier(.2,.9,.3,1.3) forwards;
 }
-.expand-wild img{width:88%;height:88%;object-fit:contain;filter:drop-shadow(0 0 14px rgba(255,215,0,.95));position:relative;z-index:2;}
+.expand-wild img{width:100%;height:100%;object-fit:cover;object-position:center;filter:drop-shadow(0 0 14px rgba(255,215,0,.95));position:relative;z-index:2;}
 @keyframes expandWildBurst{
   0%{ transform:scaleY(.28) rotate(-2deg); opacity:.55; filter:brightness(1.9); }
   40%{ transform:scaleY(1.14) rotate(1.5deg); opacity:1; filter:brightness(2.1); }
   65%{ transform:scaleY(.94) rotate(-.8deg); filter:brightness(1.3); }
   100%{ transform:scaleY(1) rotate(0); filter:brightness(1); }
 }
-/* توهج ذهبي متفجر خلف الشجرة لحظة التمدد */
-.expand-wild::before{
-  content:'';
+.wild-glow{
   position:absolute; inset:-25%;
   border-radius:50%;
   background:radial-gradient(circle, rgba(255,215,0,.65) 0%, rgba(255,215,0,.15) 45%, transparent 72%);
-  z-index:1;
+  z-index:9;
+  pointer-events:none;
   animation:wildGlowPulse .75s ease-out forwards;
 }
 @keyframes wildGlowPulse{
@@ -70,7 +69,6 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
   45%{ opacity:1; transform:scale(1.25); }
   100%{ opacity:0; transform:scale(1.7); }
 }
-/* شرر ذهبي متطاير */
 .spark{
   position:absolute; width:6px; height:6px; border-radius:50%;
   background:radial-gradient(circle, #fff, var(--gold2) 55%, transparent 100%);
@@ -82,7 +80,19 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
   0%{ transform:translate(0,0) scale(1); opacity:1; }
   100%{ transform:translate(var(--sx), var(--sy)) scale(0); opacity:0; }
 }
-/* اهتزاز خفيف للبكرات كلها لحظة التمدد */
+.reel.spinning{ overflow:hidden; }
+.reel.spinning .cell img{
+  filter:blur(1.3px) brightness(1.04);
+  transform:scaleY(1.08);
+  transition:filter .06s linear, transform .06s linear;
+}
+.reel.spinning .cell{ opacity:.92; }
+.cell.dropping img{ animation:cellDrop .22s cubic-bezier(.3,.9,.4,1); }
+@keyframes cellDrop{
+  0%{ transform:translateY(-30%) scaleY(1.15); opacity:.5; }
+  70%{ transform:translateY(4%) scaleY(1.02); opacity:1; }
+  100%{ transform:translateY(0) scaleY(1); opacity:1; }
+}
 .reels.shake{ animation:reelShake .35s ease-in-out; }
 @keyframes reelShake{
   0%,100%{ transform:translate(0,0); }
@@ -91,7 +101,6 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
   60%{ transform:translate(-4px,-2px); }
   80%{ transform:translate(3px,1px); }
 }
-/* ومضة ذهبية خفيفة على كامل الشاشة */
 #goldFlash{
   position:fixed; inset:0; z-index:120; pointer-events:none; opacity:0;
   background:radial-gradient(circle, rgba(255,215,0,.32), transparent 65%);
@@ -103,17 +112,16 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
 #lineOverlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5;}
 .win-line{
   stroke:var(--gold2);
-  stroke-width:2.2;
+  stroke-width:2.4;
   fill:none;
   stroke-linecap:round;
   stroke-linejoin:round;
   filter:drop-shadow(0 0 3px rgba(255,215,0,.95)) drop-shadow(0 0 6px rgba(255,215,0,.6));
-  stroke-dasharray:250;
-  stroke-dashoffset:250;
-  animation:drawLine .45s ease-out forwards;
+  opacity:0;
+  animation:lineFadeIn .3s ease-out forwards;
   vector-effect:non-scaling-stroke;
 }
-@keyframes drawLine{ to{ stroke-dashoffset:0; } }
+@keyframes lineFadeIn{ to{ opacity:1; } }
 .suits{direction:ltr;display:flex;gap:5px;margin-bottom:10px;}
 .suit{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:4px;padding:6px 4px;border-radius:18px;
   background:rgba(10,4,30,.55);border:1.5px solid #8a6a2a;font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;}
@@ -211,6 +219,37 @@ button:disabled{opacity:.5;cursor:not-allowed;}
   border:2px solid var(--gold2);border-radius:20px;padding:22px 30px;text-align:center;
   box-shadow:0 0 30px rgba(255,215,0,.4);line-height:1.6;}
 .fs-intro-text b{font-size:34px;display:block;margin-top:4px;}
+.win-overlay{
+  display:none;position:fixed;inset:0;z-index:180;align-items:center;justify-content:center;
+  flex-direction:column;pointer-events:none;
+  background:radial-gradient(circle, rgba(40,10,70,.5), rgba(0,0,0,.72));
+}
+.win-overlay.show{display:flex;animation:winOverlayIn .35s ease-out;}
+@keyframes winOverlayIn{ 0%{opacity:0;transform:scale(.7);} 100%{opacity:1;transform:scale(1);} }
+.win-overlay-title{
+  font-family:'Amiri',serif;font-size:38px;font-weight:800;color:var(--gold2);letter-spacing:2px;
+  text-shadow:0 0 22px rgba(255,215,0,.85),0 3px 6px #000;
+}
+.win-overlay-amount{
+  margin-top:12px;font-size:46px;font-weight:800;color:#fff;
+  text-shadow:0 0 16px rgba(255,215,0,.7),0 2px 4px #000;
+}
+.shock-ring{
+  position:fixed; top:50%; left:50%; width:10px; height:10px;
+  border-radius:50%; border:3px solid rgba(255,215,0,.9);
+  transform:translate(-50%,-50%); pointer-events:none; z-index:170;
+  animation:shockRingBurst 1s cubic-bezier(.15,.8,.3,1) forwards;
+}
+@keyframes shockRingBurst{
+  0%{ width:10px; height:10px; opacity:1; border-width:4px; }
+  100%{ width:900px; height:900px; opacity:0; border-width:0px; }
+}
+.sound-toggle{
+  position:absolute;top:6px;right:6px;width:34px;height:34px;border-radius:50%;
+  border:1.5px solid rgba(212,164,55,.6);background:rgba(10,4,30,.6);color:#fff;
+  font-size:15px;cursor:pointer;z-index:15;
+}
+.sound-toggle.off{opacity:.5;}
 </style>
 </head>
 <body>
@@ -224,6 +263,7 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 <div id="gameScreen">
   <div id="stage">
   <div class="container">
+    <button class="sound-toggle" id="soundToggle" onclick="toggleSound()">🔊</button>
     <div id="freeSpinsBadge"></div>
     <div class="suits">
       <div class="suit"><b class="k">♣</b><span>2,087,245</span></div>
@@ -269,6 +309,11 @@ button:disabled{opacity:.5;cursor:not-allowed;}
   <div class="fs-intro-text">لديك<b id="fsIntroCount">5</b>لفات مجانية</div>
 </div>
 
+<div class="win-overlay" id="winOverlay">
+  <div class="win-overlay-title" id="winOverlayTitle">BIG WIN</div>
+  <div class="win-overlay-amount" id="winOverlayAmount">0</div>
+</div>
+
 <div class="modal-overlay" id="buyModal">
   <div class="modal-card">
     <div class="modal-title">BUY BONUS<span>الحد الأقصى ×20,000</span></div>
@@ -308,6 +353,7 @@ button:disabled{opacity:.5;cursor:not-allowed;}
   </div>
 </div>
 
+<audio id="bgMusic" src="images/bg-music.mp3" loop preload="auto" style="display:none"></audio>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script>
 window.__dataReady=false;
@@ -339,8 +385,10 @@ const userId = String(tg?.initDataUnsafe?.user?.id || TEST_ID);
 const userName = tg?.initDataUnsafe?.user?.first_name || 'ضيف';
 
 const SYMS = [
-  {key:'wild',    weight:2},
-  {key:'scatter', weight:3},
+  {key:'wild',         weight:2},
+  {key:'scatterDollar',img:'images/scatter-dollar.png', e:'💲', weight:2},
+  {key:'scatterStar',  img:'images/scatter-star.png',   e:'⭐', weight:1},
+  {key:'blank',   img:'images/blank.png',      e:'🍓', weight:60},
   {key:'seven',   img:'images/seven.png',      e:'7️⃣', weight:5},
   {key:'grape',   img:'images/grape.png',      e:'🍇', weight:7},
   {key:'melon',   img:'images/watermelon.png', e:'🍉', weight:7},
@@ -351,15 +399,18 @@ const SYMS = [
   {key:'plum',    img:'images/eggplant.png',   e:'🍆', weight:13}
 ];
 const WILD_IMG = {2:'images/wild-x2.png',3:'images/wild-x3.png',5:'images/wild-x5.png',10:'images/wild-base.png'};
-const SCAT_IMG = ['images/scatter-dollar.png','images/scatter-star.png'];
 const PAY = {
-  wild:{2:.6,3:3,4:15,5:300}, seven:{2:.6,3:3,4:15,5:300},
-  grape:{3:2.4,4:7.2,5:42}, melon:{3:2.4,4:7.2,5:42}, bell:{3:1.2,4:2.4,5:12},
-  cherry:{3:.6,4:1.8,5:9}, orange:{3:.6,4:1.8,5:9}, lemon:{3:.6,4:1.8,5:9}, plum:{3:.6,4:1.8,5:9}
+  wild:{2:2,3:10,4:50,5:1000},
+  seven:{2:2,3:10,4:50,5:1000},
+  grape:{3:8,4:24,5:140}, melon:{3:8,4:24,5:140}, bell:{3:4,4:8,5:40},
+  cherry:{3:2,4:6,5:30}, orange:{3:2,4:6,5:30}, lemon:{3:2,4:6,5:30}, plum:{3:2,4:6,5:30},
+  scatterDollar:{3:10,4:40,5:200},
+  scatterStar:{3:40,4:120,5:400}
 };
 const BONUS_COST_MULT = { '1':75, '2':175, '3':500, 'r':150 };
 
-/* ✅ محرك أصوات مولّدة بالكود مباشرة (Web Audio API) - بدون أي ملف صوتي خارجي */
+function R(n){ return Math.round(n); }
+
 const SoundEngine = (() => {
   let ctx = null;
   function ac(){
@@ -400,16 +451,75 @@ const SoundEngine = (() => {
     src.connect(filt); filt.connect(gain); gain.connect(c.destination);
     src.start(t0);
   }
+
+  const bgMusicEl = document.getElementById('bgMusic');
+  let musicBroken = false;
+  if(bgMusicEl){
+    bgMusicEl.volume = 0.15;
+    bgMusicEl.addEventListener('error', ()=>{ musicBroken = true; console.warn('bg-music.mp3 فشل تحميلها، رح نستخدم الموسيقى المولّدة بدلها'); startAmbientSynth(); });
+  }
+  let ambientOn = false;
+  let ambientNodes = null;
+  function startAmbientSynth(){
+    const c = ac(); if(!c || ambientNodes) return;
+    ambientOn = true;
+    const master = c.createGain();
+    master.gain.setValueAtTime(0, c.currentTime);
+    master.gain.linearRampToValueAtTime(0.018, c.currentTime + 2);
+    master.connect(c.destination);
+    const freqs = [130.81, 196.0, 246.94];
+    const oscs = freqs.map(f=>{
+      const osc = c.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = f;
+      const g = c.createGain();
+      g.gain.value = 0.5;
+      osc.connect(g); g.connect(master);
+      osc.start();
+      return osc;
+    });
+    const lfo = c.createOscillator();
+    lfo.frequency.value = 0.06;
+    const lfoGain = c.createGain();
+    lfoGain.gain.value = 0.02;
+    lfo.connect(lfoGain); lfoGain.connect(master.gain);
+    lfo.start();
+    ambientNodes = { master, oscs, lfo };
+  }
+  function stopAmbientSynth(){
+    if(!ambientNodes) return;
+    const c = ac();
+    const t = c ? c.currentTime : 0;
+    ambientNodes.master.gain.linearRampToValueAtTime(0, t+0.6);
+    setTimeout(()=>{
+      try{ ambientNodes.oscs.forEach(o=>o.stop()); ambientNodes.lfo.stop(); }catch(e){}
+      ambientNodes = null;
+    }, 700);
+    ambientOn = false;
+  }
+  function startAmbient(){
+    if(musicBroken){ startAmbientSynth(); return; }
+    if(!bgMusicEl) { startAmbientSynth(); return; }
+    bgMusicEl.play().then(()=>{ ambientOn = true; }).catch(()=>{ startAmbientSynth(); });
+  }
+  function stopAmbient(){
+    if(bgMusicEl && !musicBroken) bgMusicEl.pause();
+    if(ambientNodes) stopAmbientSynth();
+    ambientOn = false;
+  }
   return {
-    unlock(){ ac(); },
+    unlock(){ ac(); startAmbient(); },
+    toggleAmbient(){ if(ambientOn) stopAmbient(); else startAmbient(); return ambientOn; },
     click(){ noiseBurst(0.05,0.18,0,4000); tone(900,0.04,'square',0.05); },
     reelTick(){ tone(500 + Math.random()*150, 0.035, 'square', 0.05); },
     reelStop(){ noiseBurst(0.06,0.15,0,1800); tone(180,0.08,'sine',0.15); },
     wildDrop(){
       tone(90,0.25,'sine',0.3);
       [660,880,1320].forEach((f,i)=> tone(f,0.35,'triangle',0.12,0.04+i*0.05));
+      [1568,1976,2349].forEach((f,i)=> tone(f,0.5,'sine',0.22,0.02+i*0.03));
     },
     win(){ [523,659,784].forEach((f,i)=> tone(f,0.22,'triangle',0.18,i*0.09)); },
+    niceWin(){ [587,740,880,987].forEach((f,i)=> tone(f,0.25,'triangle',0.19,i*0.08)); },
     bigWin(){
       [523,659,784,1047].forEach((f,i)=> tone(f,0.3,'triangle',0.2,i*0.11));
       noiseBurst(0.3,0.08,0.3,6000);
@@ -435,7 +545,7 @@ const LEVELS = [
 let BETS = LEVELS[0];
 let lvl=0, betIdx=0, speed=0;
 let autoLeft=0, autoInfinite=false;
-const SPD = [[8,90],[5,60],[3,35]];
+const SPD = [[8,105],[5,72],[3,45]];
 const STAGGER_TICKS = 3;
 const REELS=5, ROWS=3;
 
@@ -447,16 +557,44 @@ let guaranteedWildsPerSpin=0;
 let pendingPkg=null;
 const $ = id => document.getElementById(id);
 
-function randomCell(){
-  const key = pick(SYMS).key, c={key};
+const SYMS_NO_BLANK = SYMS.filter(s => s.key !== 'blank');
+const SYMS_NO_WILD = SYMS.filter(s => s.key !== 'wild');
+const SYMS_NO_BLANK_NO_WILD = SYMS.filter(s => s.key !== 'blank' && s.key !== 'wild');
+let lastBlankReels = new Set();
+let spinsSinceWild = 0;
+const WILD_PITY_SPINS = 20;
+function poolForReel(r, avoidBlank, allowWild){
+  if(r===1 || r===3) return allowWild ? SYMS_NO_BLANK : SYMS_NO_BLANK_NO_WILD;
+  if(avoidBlank) return allowWild ? SYMS_NO_BLANK : SYMS_NO_BLANK_NO_WILD;
+  return allowWild ? SYMS : SYMS_NO_WILD;
+}
+
+function randomCell(pool){
+  const key = pick(pool).key, c={key};
   if(key==='wild') c.mult = pick(WMULTS).val;
-  if(key==='scatter') c.v = SCAT_IMG[Math.floor(Math.random()*2)];
   return c;
 }
-function randomColumn(){ return Array.from({length:ROWS}, randomCell); }
+function randomColumn(pool){ return Array.from({length:ROWS}, ()=>randomCell(pool)); }
 
 function makeGrid(){
-  const grid = Array.from({length:REELS}, randomColumn);
+  const bonusForce = guaranteedWildsPerSpin > 0;
+  const pityReached = spinsSinceWild >= WILD_PITY_SPINS;
+  const allowWild = bonusForce || inFree || pityReached;
+  const usedBlankRows = new Set();
+  const grid = [];
+  for(let r=0;r<REELS;r++){
+    const eligible = (r===0 || r===2 || r===4);
+    const pool = poolForReel(r, lastBlankReels.has(r), allowWild);
+    const col = Array.from({length:ROWS}, (_, row) => {
+      let c = randomCell(pool);
+      if(eligible && c.key==='blank' && usedBlankRows.has(row)){
+        c = randomCell(allowWild ? SYMS_NO_BLANK : SYMS_NO_BLANK_NO_WILD);
+      }
+      if(eligible && c.key==='blank') usedBlankRows.add(row);
+      return c;
+    });
+    grid.push(col);
+  }
   if(guaranteedWildsPerSpin>0){
     const positions=[];
     for(let r=0;r<REELS;r++) for(let row=0;row<ROWS;row++) positions.push([r,row]);
@@ -466,23 +604,34 @@ function makeGrid(){
       grid[r][row] = { key:'wild', mult: pick(WMULTS).val };
     }
   }
+  if(!bonusForce && !inFree){
+    let hasWild = grid.some(col=>col.some(c=>c.key==='wild'));
+    if(pityReached && !hasWild){
+      const fr = [0,2,4][Math.floor(Math.random()*3)];
+      const frow = Math.floor(Math.random()*ROWS);
+      grid[fr][frow] = { key:'wild', mult: pick(WMULTS).val };
+      hasWild = true;
+    }
+    spinsSinceWild = hasWild ? 0 : spinsSinceWild + 1;
+  }
+  const newBlankReels = new Set();
+  [0,2,4].forEach(r=>{ if(grid[r].some(c=>c.key==='blank')) newBlankReels.add(r); });
+  lastBlankReels = newBlankReels;
   return grid;
 }
 function imgOf(c){
   if(c.key==='wild') return WILD_IMG[c.mult];
-  if(c.key==='scatter') return c.v;
   return SYMS.find(s=>s.key===c.key).img;
 }
 function emojiOf(c){
   if(c.key==='wild') return '🌳';
-  if(c.key==='scatter') return '⭐';
   return SYMS.find(s=>s.key===c.key).e;
 }
 
 function cellHTML(c, isWin){
   const badge = c.key==='wild' && c.mult===10 ? '<span class="badge">x10</span>' : '';
   const wildClass = (isWin && c.key==='wild') ? ' wild-win' : '';
-  return `<div class="cell ${isWin?'win'+wildClass:''}"><img src="${imgOf(c)}" alt="" onerror="this.replaceWith(document.createTextNode('${emojiOf(c)}'))">${badge}</div>`;
+  return `<div class="cell dropping ${isWin?'win'+wildClass:''}"><img class="sym-${c.key}" src="${imgOf(c)}" alt="" onerror="this.replaceWith(document.createTextNode('${emojiOf(c)}'))">${badge}</div>`;
 }
 function renderReelColumn(r, cells, winRowsForReel){
   const el = document.getElementById('reelCol'+r);
@@ -523,7 +672,6 @@ function clearWinLines(){
   if(svg) svg.innerHTML='';
 }
 
-/* ✅ شرر ذهبي متطاير حوالين الشجرة المتمددة */
 function spawnSparks(container, count){
   for(let i=0;i<count;i++){
     const s = document.createElement('span');
@@ -538,7 +686,6 @@ function spawnSparks(container, count){
     setTimeout(()=> s.remove(), 850);
   }
 }
-/* ✅ ومضة ذهبية على كامل الشاشة */
 function triggerGoldFlash(){
   let fl = document.getElementById('goldFlash');
   if(!fl){
@@ -547,7 +694,7 @@ function triggerGoldFlash(){
     document.body.appendChild(fl);
   }
   fl.classList.remove('on');
-  void fl.offsetWidth; // إعادة تشغيل الأنيميشن
+  void fl.offsetWidth;
   fl.classList.add('on');
 }
 
@@ -555,29 +702,48 @@ function evaluate(grid, b){
   let total=0; const wins=[]; const winLinesCells=[];
   LINES.forEach(line=>{
     const seq = line.map((row,r)=>grid[r][row]);
-    let target=null;
-    for(const s of seq){ if(s.key!=='wild' && s.key!=='scatter'){ target=s.key; break; } }
-    if(!target) target='wild';
-    let count=0; const cells=[];
+    let target=null, count=0; const cells=[];
     for(let i=0;i<seq.length;i++){
-      if(seq[i].key===target || seq[i].key==='wild'){ count++; cells.push([i,line[i]]); } else break;
+      const s = seq[i];
+      if(s.key==='blank' || s.key==='scatterDollar' || s.key==='scatterStar') break;
+      if(s.key==='wild'){ count++; cells.push([i,line[i]]); continue; }
+      if(target===null){ target=s.key; count++; cells.push([i,line[i]]); continue; }
+      if(s.key===target){ count++; cells.push([i,line[i]]); continue; }
+      break;
     }
+    if(target===null) target='wild';
     const t = PAY[target];
     if(t && t[count]){
       let w = b*t[count];
       const m = cells.reduce((s,[r,row])=>grid[r][row].key==='wild' ? s+grid[r][row].mult : s, 0);
       if(m>0) w *= m;
+      w = R(w);
       total += w; wins.push(...cells);
       winLinesCells.push(cells);
     }
   });
-  let sc=0;
-  grid.forEach(col=>col.forEach(c=>{ if(c.key==='scatter') sc++; }));
+  total = R(total);
+  const dollarCells=[], starCells=[];
+  grid.forEach((col,r)=>col.forEach((c,row)=>{
+    if(c.key==='scatterDollar') dollarCells.push([r,row]);
+    if(c.key==='scatterStar') starCells.push([r,row]);
+  }));
+  const sc = dollarCells.length + starCells.length;
+  if(dollarCells.length>=3 && PAY.scatterDollar[Math.min(dollarCells.length,5)]){
+    total = R(total + b*PAY.scatterDollar[Math.min(dollarCells.length,5)]);
+    wins.push(...dollarCells);
+    winLinesCells.push(dollarCells);
+  }
+  if(starCells.length>=3 && PAY.scatterStar[Math.min(starCells.length,5)]){
+    total = R(total + b*PAY.scatterStar[Math.min(starCells.length,5)]);
+    wins.push(...starCells);
+    winLinesCells.push(starCells);
+  }
   return {total, wins, sc, winLinesCells};
 }
 
 function update(){
-  $('balance').textContent = Math.floor(balance*100)/100;
+  $('balance').textContent = R(balance).toLocaleString();
   const b=$('freeSpinsBadge');
   b.style.display = inFree ? 'block' : 'none';
   b.textContent = `لفات مجانية متبقية: ${freeLeft}`;
@@ -629,12 +795,17 @@ function autoNext(){
 }
 window.cycleSpeed = () => { speed=(speed+1)%3; $('speedBtn').textContent='⚡'.repeat(speed+1); };
 
+window.toggleSound = () => {
+  const on = SoundEngine.toggleAmbient();
+  $('soundToggle').classList.toggle('off', !on);
+};
+
 function updateBonusCosts(){
   $('bonusBetDisplay').textContent = bet.toLocaleString()+' NSP';
-  $('pkgCost1').textContent = (bet*BONUS_COST_MULT['1']).toLocaleString()+' NSP';
-  $('pkgCost2').textContent = (bet*BONUS_COST_MULT['2']).toLocaleString()+' NSP';
-  $('pkgCost3').textContent = (bet*BONUS_COST_MULT['3']).toLocaleString()+' NSP';
-  $('pkgCostR').textContent = (bet*BONUS_COST_MULT['r']).toLocaleString()+' NSP';
+  $('pkgCost1').textContent = R(bet*BONUS_COST_MULT['1']).toLocaleString()+' NSP';
+  $('pkgCost2').textContent = R(bet*BONUS_COST_MULT['2']).toLocaleString()+' NSP';
+  $('pkgCost3').textContent = R(bet*BONUS_COST_MULT['3']).toLocaleString()+' NSP';
+  $('pkgCostR').textContent = R(bet*BONUS_COST_MULT['r']).toLocaleString()+' NSP';
 }
 window.bonusStepBet = (dir) => {
   let idx = BETS.indexOf(bet);
@@ -661,13 +832,13 @@ window.selectPkg = (el, key) => {
 };
 window.confirmBuy = async () => {
   if(!pendingPkg) return;
-  const cost = bet * BONUS_COST_MULT[pendingPkg];
+  const cost = R(bet * BONUS_COST_MULT[pendingPkg]);
   if(balance < cost){
     $('result').innerHTML = `<span class="lose-t">رصيدك غير كافي (${cost.toLocaleString()})</span>`;
     closeBuyModal();
     return;
   }
-  balance -= cost;
+  balance = R(balance - cost);
   guaranteedWildsPerSpin = pendingPkg==='1' ? 1 : pendingPkg==='2' ? 2 : pendingPkg==='3' ? 3 : (1+Math.floor(Math.random()*4));
   inFree=true; freeLeft=5; freeWin=0;
   closeBuyModal();
@@ -695,7 +866,7 @@ async function loadUser(){
     let d;
     try{ d = await dbApi.loadBalance(userId, userName); }
     catch(e){ throw new Error('فشلت قراءة الرصيد من Firebase: '+(e.message||e)); }
-    balance = d.balance; totalSpins = d.totalSpins; totalWins = d.totalWins;
+    balance = R(d.balance); totalSpins = d.totalSpins; totalWins = R(d.totalWins);
     update();
   }catch(e){
     console.error(e);
@@ -713,7 +884,7 @@ window.spin = function(){
   SoundEngine.click();
   $('spinBtn').disabled = true; $('spinBtn').classList.add('spinning'); $('buyBtn').disabled = true;
   $('result').textContent = '';
-  if(!inFree){ balance -= bet; totalSpins++; }
+  if(!inFree){ balance = R(balance - bet); totalSpins++; }
   update();
 
   const finalGrid = makeGrid();
@@ -721,6 +892,7 @@ window.spin = function(){
   const stopTicks = Array.from({length:REELS}, (_,r)=> sp[0] + r*STAGGER_TICKS);
   const tickCounters = new Array(REELS).fill(0);
   const stillSpinning = new Array(REELS).fill(true);
+  for(let r=0;r<REELS;r++){ const rc=document.getElementById('reelCol'+r); if(rc) rc.classList.add('spinning'); }
 
   const iv = setInterval(()=>{
     let allStopped = true;
@@ -732,14 +904,40 @@ window.spin = function(){
       if(tickCounters[r] >= stopTicks[r]){
         stillSpinning[r] = false;
         SoundEngine.reelStop();
+        const rc = document.getElementById('reelCol'+r);
+        if(rc) rc.classList.remove('spinning');
         renderReelColumn(r, finalGrid[r], []);
       }else{
-        renderReelColumn(r, randomColumn(), []);
+        renderReelColumn(r, randomColumn(poolForReel(r)), []);
       }
     }
     if(allStopped){ clearInterval(iv); resolveWithGrid(finalGrid); }
   }, sp[1]);
 };
+
+function spawnShockRing(){
+  const ring = document.createElement('div');
+  ring.className = 'shock-ring';
+  document.body.appendChild(ring);
+  setTimeout(()=> ring.remove(), 1050);
+}
+function showWinOverlay(amount, label){
+  const ov = $('winOverlay');
+  if(!ov) return;
+  $('winOverlayTitle').textContent = label;
+  $('winOverlayAmount').textContent = '0';
+  ov.classList.add('show');
+  const dur = 1900;
+  const t0 = performance.now();
+  function step(now){
+    const p = Math.min(1, (now - t0) / dur);
+    const eased = 1 - Math.pow(1 - p, 3);
+    $('winOverlayAmount').textContent = R(amount * eased).toLocaleString();
+    if(p < 1) requestAnimationFrame(step);
+    else setTimeout(()=> ov.classList.remove('show'), 900);
+  }
+  requestAnimationFrame(step);
+}
 
 async function resolveWithGrid(grid){
   const {total, wins, sc, winLinesCells} = evaluate(grid, bet);
@@ -749,7 +947,6 @@ async function resolveWithGrid(grid){
   }
   drawWinLines(winLinesCells);
 
-  // ✅ الشجرة الفايزة تتمدد لتغطي البكرة كاملة
   const wildReels = new Set();
   winLinesCells.forEach(cells=>{
     cells.forEach(([r,row])=>{ if(grid[r][row].key==='wild') wildReels.add(r); });
@@ -757,12 +954,15 @@ async function resolveWithGrid(grid){
   wildReels.forEach(r=>{
     const col = document.getElementById('reelCol'+r);
     if(!col) return;
+    const glow = document.createElement('div');
+    glow.className = 'wild-glow';
+    col.appendChild(glow);
     const overlay = document.createElement('div');
     overlay.className = 'expand-wild';
     overlay.innerHTML = `<img src="${WILD_IMG[10]}" alt="" onerror="this.replaceWith(document.createTextNode('🌳'))">`;
     col.appendChild(overlay);
     spawnSparks(col, 10);
-    setTimeout(()=>{ overlay.remove(); }, 1400);
+    setTimeout(()=>{ glow.remove(); }, 1400);
   });
   if(wildReels.size>0){
     SoundEngine.wildDrop();
@@ -772,41 +972,51 @@ async function resolveWithGrid(grid){
   }
 
   let msg='';
+  let bigOrMega = false;
   if(total>0){
-    balance += total; totalWins += total; if(inFree) freeWin += total;
-    msg = `<span class="win-t">مكسب: ${total}</span>`;
-    if(total >= bet*50) SoundEngine.megaWin();
-    else if(total >= bet*20) SoundEngine.bigWin();
-    else SoundEngine.win();
+    balance = R(balance + total); totalWins = R(totalWins + total); if(inFree) freeWin = R(freeWin + total);
+    msg = `<span class="win-t">مكسب: ${total.toLocaleString()}</span>`;
+    if(total >= bet*50){
+      bigOrMega = true;
+      SoundEngine.megaWin();
+      showWinOverlay(total, 'MEGA WIN');
+      spawnShockRing();
+    } else if(total >= bet*20){
+      bigOrMega = true;
+      SoundEngine.bigWin();
+      showWinOverlay(total, 'BIG WIN');
+      spawnShockRing();
+    } else if(total >= bet*5){
+      SoundEngine.niceWin();
+    } else {
+      SoundEngine.win();
+    }
     if(navigator.vibrate) navigator.vibrate([100,50,100]);
-  }
-  if(sc>=3 && !inFree){
-    inFree=true; freeLeft=5; freeWin=total;
-    msg += (msg?'<br>':'') + `<span class="win-t">لفات مجانية: 5</span>`;
-    SoundEngine.freeSpins();
-    showFreeSpinsIntro(5);
   }
   $('result').innerHTML = msg;
   update();
   await save();
 
-  spinning=false;
-  $('spinBtn').classList.remove('spinning');
-  $('buyBtn').disabled=false;
-  if(inFree){
-    freeLeft--;
-    update();
-    if(freeLeft<=0){
-      inFree=false;
-      guaranteedWildsPerSpin=0;
-      $('result').innerHTML += (msg?'<br>':'') + `<span class="win-t">مجموع اللفات المجانية: ${freeWin}</span>`;
-      update(); $('spinBtn').disabled=false; autoNext();
-    } else { setTimeout(()=>spin(),1200); }
-  } else { $('spinBtn').disabled=false; autoNext(); }
+  const settleDelay = bigOrMega ? 3000 : (total>0 ? 900 : 0);
+  setTimeout(()=>{
+    spinning=false;
+    $('spinBtn').classList.remove('spinning');
+    $('buyBtn').disabled=false;
+    if(inFree){
+      freeLeft--;
+      update();
+      if(freeLeft<=0){
+        inFree=false;
+        guaranteedWildsPerSpin=0;
+        $('result').innerHTML += (msg?'<br>':'') + `<span class="win-t">مجموع اللفات المجانية: ${freeWin.toLocaleString()}</span>`;
+        update(); $('spinBtn').disabled=false; autoNext();
+      } else { setTimeout(()=>spin(),1200); }
+    } else { $('spinBtn').disabled=false; autoNext(); }
+  }, settleDelay);
 }
 
 function preloadAll(){
-  const urls=[...SYMS.filter(x=>x.img).map(x=>x.img),...Object.values(WILD_IMG),...SCAT_IMG,'images/spin-icon.jpg','images/bg.jpg'];
+  const urls=[...SYMS.filter(x=>x.img).map(x=>x.img),...Object.values(WILD_IMG),'images/spin-icon.jpg','images/bg.jpg'];
   return Promise.all(urls.map(u=>new Promise(res=>{
     const im=new Image(); const t=setTimeout(res,10000);
     im.onload=()=>{ clearTimeout(t); (im.decode?im.decode():Promise.resolve()).catch(()=>{}).then(res); };
@@ -817,7 +1027,7 @@ function preloadAll(){
 
 if(!tg?.initDataUnsafe?.user){
   const addTestBonus = () => {
-    balance += 10000; update();
+    balance = R(balance + 10000); update();
     $('result').innerHTML = '<span class="win-t">+10000 (اختبار)</span>';
   };
   const isTestKey = k => { k=(k||'').toLowerCase(); return k==='m' || k==='p' || k==='t'; };
