@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>🌳 الشجرة الذهبية</title>
+<title>⚔️ Fortune Realm</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -35,6 +35,39 @@
   .loading-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--gold),var(--gold-bright));transition:width .12s linear;}
   .loading-pct{margin-top:12px;color:var(--gold-bright);font-weight:700;font-size:16px;}
   .loading-label{margin-top:6px;color:#999;font-size:12px;}
+
+  /* ===== Hero background (صورة البنت خلف الألعاب) ===== */
+  .hero-bg{
+    position:fixed;
+    inset:0;
+    z-index:0;
+    overflow:hidden;
+    pointer-events:none;
+  }
+  .hero-bg img{
+    position:absolute;
+    right:-8%;
+    bottom:0;
+    height:112%;
+    width:auto;
+    max-width:none;
+    opacity:.4;
+    filter:saturate(1.15) contrast(1.05) drop-shadow(0 0 40px rgba(0,0,0,.6));
+    animation:heroFloat 7s ease-in-out infinite;
+  }
+  .hero-bg::before{
+    content:'';
+    position:absolute;
+    inset:0;
+    background:
+      radial-gradient(ellipse at 30% 15%, rgba(212,175,55,0.12), transparent 55%),
+      linear-gradient(180deg, rgba(10,10,10,.55) 0%, rgba(10,10,10,.82) 55%, var(--bg) 100%);
+  }
+  @keyframes heroFloat{
+    0%,100%{ transform:translateY(0) scale(1); }
+    50%{ transform:translateY(-16px) scale(1.02); }
+  }
+  #lobbyView, #gameView{ position:relative; z-index:1; }
 
   /* ===== Top bar ===== */
   .topbar{
@@ -299,10 +332,15 @@
   <div class="loading-label">جاري تحميل اللعبة...</div>
 </div>
 
+<!-- ===== خلفية البطلة (ثابتة خلف كل الألعاب) ===== -->
+<div class="hero-bg">
+  <img src="hero-girl.png" alt="" onerror="this.style.display='none'">
+</div>
+
 <!-- ===== LOBBY ===== -->
 <div id="lobbyView">
   <div class="topbar">
-    <div class="brand">🌳 الشجرة الذهبية</div>
+    <div class="brand">⚔️ FORTUNE REALM</div>
     <div class="balance-pill">💰 <span id="lobbyBalance">...</span></div>
   </div>
   <div class="user-line" id="lobbyUserInfo">جاري التحميل...</div>
