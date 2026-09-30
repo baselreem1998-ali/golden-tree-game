@@ -408,7 +408,7 @@ window.__dataReady=false;
   window.addEventListener('error',function(e){ pct.textContent='خطأ: '+e.message; console.error(e); });
   var iv=setInterval(function(){
     p+=Math.random()*15+5;
-    var late=Date.now()-t0>20000;
+    var late=Date.now()-t0>45000;
     if(!window.__dataReady && !late) p=Math.min(p,90);
     if(p>=100){ p=100; clearInterval(iv); setTimeout(done,300); }
     bar.style.width=p+'%'; pct.textContent=Math.floor(p)+'%';
@@ -989,7 +989,7 @@ function showWinOverlay(amount, label){
   $('winOverlayTitle').textContent = label;
   $('winOverlayAmount').textContent = '0';
   ov.classList.add('show');
-  const dur = 1900;
+  const dur = 2800;
   const t0 = performance.now();
   function step(now){
     const p = Math.min(1, (now - t0) / dur);
@@ -1010,9 +1010,7 @@ async function resolveWithGrid(grid){
   drawWinLines(winLinesCells);
 
   const wildReels = new Set();
-  winLinesCells.forEach(cells=>{
-    cells.forEach(([r,row])=>{ if(grid[r][row].key==='wild') wildReels.add(r); });
-  });
+  grid.forEach((col,r)=>{ if(col.some(c=>c.key==='wild')) wildReels.add(r); });
   wildReels.forEach(r=>{
     const col = document.getElementById('reelCol'+r);
     if(!col) return;
@@ -1059,7 +1057,7 @@ async function resolveWithGrid(grid){
   update();
   await save();
 
-  const settleDelay = bigOrMega ? 3000 : (total>0 ? 900 : 0);
+  const settleDelay = bigOrMega ? 3900 : (total>0 ? 900 : 0);
   setTimeout(()=>{
     spinning=false;
     $('spinBtn').classList.remove('spinning');
