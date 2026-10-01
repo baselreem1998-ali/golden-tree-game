@@ -64,6 +64,7 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
 .strip{display:flex;flex-direction:column;gap:2px;will-change:transform;}
 .cell{width:100%;aspect-ratio:1/1.12;min-height:0;overflow:hidden;position:relative;border-radius:6px;font-size:30px;display:flex;align-items:center;justify-content:center;flex:none;}
 .cell img{position:absolute;inset:2%;width:96%;height:96%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55));}
+.cell img.sym-blank{inset:15%;width:70%;height:70%;}
 .cell.win{background:rgba(61,220,151,.18);z-index:2;animation:winCelebrate 1s ease-in-out infinite;box-shadow:0 0 14px var(--gold2);}
 @keyframes winCelebrate{
   0%{transform:scale(1);}
