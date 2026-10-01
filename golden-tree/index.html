@@ -30,6 +30,10 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
   0%{ transform:translate(0,0) scale(1); opacity:.7; }
   100%{ transform:translate(3%,-2%) scale(1.08); opacity:1; }
 }
+/* ===== بقع بنفسجية ضبابية متحركة ===== */
+.orb{position:fixed;border-radius:50%;filter:blur(40px);background:rgba(150,80,255,.35);
+  animation:orbF 12s ease-in-out infinite alternate;pointer-events:none;z-index:0;}
+@keyframes orbF{to{transform:translate(40px,-60px) scale(1.3)}}
 .container{position:relative;z-index:1;width:380px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));}
 .bottom{margin-top:12px;}
 .balance{font-weight:700;color:var(--gold2);}
@@ -57,8 +61,9 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
   background:linear-gradient(180deg, rgba(255,255,255,.10), transparent);
   pointer-events:none;z-index:1;
 }
-.cell{width:100%;aspect-ratio:1/1;min-height:0;overflow:hidden;position:relative;border-radius:6px;font-size:30px;display:flex;align-items:center;justify-content:center;}
-.cell img{position:absolute;inset:6%;width:88%;height:88%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55));}
+.strip{display:flex;flex-direction:column;gap:2px;will-change:transform;}
+.cell{width:100%;aspect-ratio:1/1.12;min-height:0;overflow:hidden;position:relative;border-radius:6px;font-size:30px;display:flex;align-items:center;justify-content:center;flex:none;}
+.cell img{position:absolute;inset:2%;width:96%;height:96%;object-fit:contain;filter:drop-shadow(0 3px 3px rgba(0,0,0,.55));}
 .cell img.sym-blank{inset:-34%;width:168%;height:168%;}
 .cell.win{background:rgba(61,220,151,.18);z-index:2;animation:winCelebrate 1s ease-in-out infinite;box-shadow:0 0 14px var(--gold2);}
 @keyframes winCelebrate{
@@ -113,10 +118,8 @@ body{min-height:100vh;font-family:'Cairo',sans-serif;color:#f2f2f2;overflow-x:hi
 .reel.spinning{ overflow:hidden; }
 .reel.spinning .cell img{
   filter:blur(1.3px) brightness(1.04);
-  transform:scaleY(1.08);
-  transition:filter .06s linear, transform .06s linear;
+  transition:filter .06s linear;
 }
-.reel.spinning .cell{ opacity:.92; }
 .cell.dropping img{ animation:cellDrop .22s cubic-bezier(.3,.9,.4,1); }
 @keyframes cellDrop{
   0%{ transform:translateY(-30%) scaleY(1.15); opacity:.5; }
@@ -292,6 +295,11 @@ button:disabled{opacity:.5;cursor:not-allowed;}
 </style>
 </head>
 <body>
+
+<!-- بقع ضبابية متحركة -->
+<div class="orb" style="width:180px;height:180px;top:10%;left:5%"></div>
+<div class="orb" style="width:220px;height:220px;top:45%;right:-5%;animation-delay:-4s"></div>
+<div class="orb" style="width:160px;height:160px;bottom:8%;left:20%;animation-delay:-8s"></div>
 
 <div id="splashScreen">
   <div class="game-title">Tree of Chronos</div>
@@ -607,8 +615,6 @@ const LEVELS = [
 let BETS = LEVELS[0];
 let lvl=0, betIdx=0, speed=0;
 let autoLeft=0, autoInfinite=false;
-const SPD = [[8,105],[5,72],[3,45]];
-const STAGGER_TICKS = 3;
 const REELS=5, ROWS=3;
 
 const pick = l => { let r=Math.random()*l.reduce((s,x)=>s+x.weight,0); for(const i of l){ r-=i.weight; if(r<=0) return i; } return l[l.length-1]; };
@@ -617,6 +623,7 @@ let balance=0, bet=300, spinning=false, totalSpins=0, totalWins=0;
 let inFree=false, freeLeft=0, freeWin=0;
 let guaranteedWildsPerSpin=0;
 let pendingPkg=null;
+let currentGrid=null;
 const $ = id => document.getElementById(id);
 
 const SYMS_NO_BLANK = SYMS.filter(s => s.key !== 'blank');
@@ -713,6 +720,35 @@ function render(grid, wins=[]){
     const winRows = wins.filter(([wr])=>wr===r).map(([,wrow])=>wrow);
     renderReelColumn(r, grid[r], winRows);
   }
+}
+
+/* ===== دوران حقيقي: شريط عمودي ينزل ويوقف ===== */
+function rollReel(r, oldCells, finalCells, ms){
+  return new Promise(res=>{
+    const col = document.getElementById('reelCol'+r);
+    if(!col){ res(); return; }
+    const mid = Array.from({length:10+r*4}, ()=>randomCell(poolForReel(r)));
+    const all = [...finalCells, ...mid, ...oldCells];
+    // نثبت ارتفاع البكرة قبل ما نحط الشريط الطويل
+    const lockedH = col.offsetHeight;
+    col.style.height = lockedH+'px';
+    col.innerHTML = '<div class="strip">'+all.map(c=>cellHTML(c,false).replace(' dropping','')).join('')+'</div>';
+    const strip = col.firstChild;
+    const h = strip.children[0].offsetHeight + 2;
+    strip.style.transform = `translateY(${-(all.length-ROWS)*h}px)`;
+    strip.getBoundingClientRect();
+    strip.style.transition = `transform ${ms}ms cubic-bezier(.15,.7,.25,1)`;
+    strip.style.transform = 'translateY(0)';
+    col.classList.add('spinning');
+    setTimeout(()=>{
+      col.classList.remove('spinning');
+      SoundEngine.reelStop();
+      renderReelColumn(r, finalCells, []);
+      col.querySelectorAll('.dropping').forEach(e=>e.classList.remove('dropping'));
+      col.style.height = '';
+      res();
+    }, ms+30);
+  });
 }
 
 function cellCenterPct(r,row){ return { x:(r+0.5)/REELS*100, y:(row+0.5)/ROWS*100 }; }
@@ -921,7 +957,10 @@ async function save(){
 }
 
 async function loadUser(){
-  renderChips(); render(makeGrid()); update();
+  renderChips();
+  currentGrid = makeGrid();
+  render(currentGrid);
+  update();
   try{
     try{ dbApi = await import('./db.js'); }
     catch(e){ throw new Error('فشل تحميل ملف db.js (تأكدي إنو جنب index.html): '+(e.message||e)); }
@@ -950,31 +989,10 @@ window.spin = function(){
   update();
 
   const finalGrid = makeGrid();
-  const sp = SPD[speed];
-  const stopTicks = Array.from({length:REELS}, (_,r)=> sp[0] + r*STAGGER_TICKS);
-  const tickCounters = new Array(REELS).fill(0);
-  const stillSpinning = new Array(REELS).fill(true);
-  for(let r=0;r<REELS;r++){ const rc=document.getElementById('reelCol'+r); if(rc) rc.classList.add('spinning'); }
-
-  const iv = setInterval(()=>{
-    let allStopped = true;
-    for(let r=0;r<REELS;r++){
-      if(!stillSpinning[r]) continue;
-      allStopped = false;
-      tickCounters[r]++;
-      if(tickCounters[r] % 2 === 0) SoundEngine.reelTick();
-      if(tickCounters[r] >= stopTicks[r]){
-        stillSpinning[r] = false;
-        SoundEngine.reelStop();
-        const rc = document.getElementById('reelCol'+r);
-        if(rc) rc.classList.remove('spinning');
-        renderReelColumn(r, finalGrid[r], []);
-      }else{
-        renderReelColumn(r, randomColumn(poolForReel(r)), []);
-      }
-    }
-    if(allStopped){ clearInterval(iv); resolveWithGrid(finalGrid); }
-  }, sp[1]);
+  const oldGrid = currentGrid || finalGrid;
+  const base = [900,650,450][speed];
+  Promise.all(finalGrid.map((_,r)=> rollReel(r, oldGrid[r], finalGrid[r], base + r*250)))
+    .then(()=>{ currentGrid = finalGrid; resolveWithGrid(finalGrid); });
 };
 
 function spawnShockRing(){
