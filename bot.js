@@ -96,12 +96,12 @@ bot.on('message', async (msg) => {
         chatId,
         `🎰 *قسم الألعاب*\n\n` +
         `💰 رصيدك: *${user.botBalance || 0}* NSP\n\n` +
-        `اضغطي "لعب الآن" وابدئي مباشرة:`,
+        `اضغط "لعب الآن" وابدء مباشرة:`,
         { parse_mode: 'Markdown', reply_markup: getGamesKeyboard() }
       );
       break;
 
-    case '📥 شحن رصيد من البوت':
+    case '📥 شحن رصيد في البوت':
       bot.sendMessage(chatId, 'اختر طريقة الشحن:', { reply_markup: getDepositKeyboard() });
       break;
 
