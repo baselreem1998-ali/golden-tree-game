@@ -359,7 +359,7 @@ if (adminToken) {
         await runTransaction(ref(db, `users/${req.userId}/totalWithdrawals`), (t) => (t || 0) + req.amount);
         bot.sendMessage(req.userId, `✅ تمت الموافقة على طلب السحب\n💰 ${num(req.amount)} ل.س\nسيصلك المبلغ قريباً.`).catch(() => {});
       } else {
-        await runTransaction(ref(db, `users/${req.userId}/balance`), (b) => (b || 0) + req.amount);
+        await runTransaction(ref(db, `users/${req.userId}/botBalance`), (b) => (b || 0) + req.amount);
         bot.sendMessage(req.userId, `❌ تم رفض طلب السحب وأُعيد ${num(req.amount)} ل.س إلى رصيدك.`).catch(() => {});
       }
       await adminBot.editMessageText(
@@ -467,10 +467,10 @@ bot.on('message', async (msg) => {
       const res = await runTransaction(ref(db, `users/${userId}`), (u) => {
         reason = null;
         if (u === null) return u;
-        const bal = typeof u.balance === 'number' ? u.balance : 0;
+        const bal = typeof u.botBalance === 'number' ? u.botBalance : 0;
         before = bal;
         if (bal < amount) { reason = 'nobal'; return; }
-        u.balance = bal - amount;
+        u.botBalance = bal - amount;
         return u;
       });
 
@@ -493,7 +493,7 @@ bot.on('message', async (msg) => {
           account: st.account, amount, status: 'pending', createdAt: Date.now()
         });
       } catch (e) {
-        await runTransaction(ref(db, `users/${userId}/balance`), (b) => (b || 0) + amount);
+        await runTransaction(ref(db, `users/${userId}/botBalance`), (b) => (b || 0) + amount);
         wdState.delete(userId);
         bot.sendMessage(chatId, '❌ تعذّر إرسال الطلب، أُعيد المبلغ لرصيدك. حاول مرة أخرى.');
         return;
