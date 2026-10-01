@@ -23,7 +23,7 @@ const webAppUrl = 'https://jakesparow13.github.io/golden-tree-game/';
 const bot = new TelegramBot(token, { polling: true });
 
 // قائمة الأدمن (حط الـ User ID تبعك)
-const ADMIN_IDS = [123456789]; // غيّر هذا الرقم بـ ID تبعك
+const ADMIN_IDS = [8298812929]; // غيّر هذا الرقم بـ ID تبعك
 
 // دالة لإنشاء أو جلب بيانات المستخدم
 async function getOrCreateUser(userId, userName) {
