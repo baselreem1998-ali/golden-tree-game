@@ -48,14 +48,7 @@ async function getOrCreateUser(userId, userName) {
 
 // قائمة الأزرار الرئيسية
 function getMainKeyboard() {
-  return {
-    keyboard: [
-      [{ text: '🚀 ستارت' }]
-    ],
-    resize_keyboard: true,
-    is_persistent: true,
-    one_time_keyboard: false
-  };
+  return { remove_keyboard: true };
 }
 
 // قائمة أزرار الألعاب (بسيطة الآن - رصيد واحد مشترك، بدون تحويل)
@@ -995,4 +988,30 @@ bot.on('callback_query', (query) => {
     date: Math.floor(Date.now() / 1000),
     text
   });
+});
+
+// ===== قائمة الأوامر (زر القائمة) + حذف رسالة القائمة عند الاختيار =====
+bot.setMyCommands([
+  { command: 'start', description: 'بدء استخدام البوت' },
+  { command: 'myaccount', description: 'معلومات حسابي' },
+  { command: 'cancel', description: 'إلغاء العملية الحالية' }
+]).catch(() => {});
+
+bot.onText(/^\/myaccount/, (msg) => {
+  acState.delete(msg.from.id);
+  acShowInfo(msg.chat.id, msg.from.id).catch(() => {});
+});
+
+bot.onText(/^\/cancel/, (msg) => {
+  gwState.delete(msg.from.id);
+  acState.delete(msg.from.id);
+});
+
+// لما يختار زر، رسالة القوائم بتنحذف وبيطلع الخيار بس
+bot.on('callback_query', (query) => {
+  const d = query.data || '';
+  if (!query.message) return;
+  if (/^(mn_\d+|back_main|wd_syr|wd_sham|dp_syr|dp_sham|dpc_\d+|dpc_x|gw_in_all|gw_out_all)$/.test(d)) {
+    bot.deleteMessage(query.message.chat.id, query.message.message_id).catch(() => {});
+  }
 });
