@@ -271,12 +271,83 @@ const server = http.createServer((req, res) => {
   res.end('Bot is running!');
 });
 server.listen(process.env.PORT || 3000);
-// ===== بوت الإدارة (إضافة جديدة) =====
+// ===== بوت الإدارة =====
 const adminToken = process.env.ADMIN_BOT_TOKEN;
 if (adminToken) {
   const adminBot = new TelegramBot(adminToken, { polling: true });
+  const isAdmin = (id) => ADMIN_IDS.includes(id);
+  const awaitingSearch = new Set();
+  const fmt = (n) => Number(n || 0).toLocaleString('en-US');
+  const adminKeyboard = {
+    keyboard: [
+      [{ text: '🚀 ستارت' }],
+      [{ text: '📊 إحصائيات' }, { text: '👥 اللاعبون' }],
+      [{ text: '🔍 بحث عن لاعب' }]
+    ],
+    resize_keyboard: true,
+    is_persistent: true
+  };
+
   adminBot.onText(/\/start/, (msg) => {
-    adminBot.sendMessage(msg.chat.id, `🆔 رقم الـ ID تبعك: ${msg.from.id}`);
+    if (!isAdmin(msg.from.id)) {
+      adminBot.sendMessage(msg.chat.id, `🆔 رقم الـ ID تبعك: ${msg.from.id}`);
+      return;
+    }
+    adminBot.sendMessage(msg.chat.id, '🛡️ لوحة الإدارة', { reply_markup: adminKeyboard });
+  });
+
+  adminBot.on('message', async (msg) => {
+    const chatId = msg.chat.id;
+    const adminId = msg.from.id;
+    const text = msg.text;
+    if (!text || text.startsWith('/') || !isAdmin(adminId)) return;
+    try {
+      if (text === '🚀 ستارت') {
+        awaitingSearch.delete(adminId);
+        adminBot.sendMessage(chatId, '🛡️ لوحة الإدارة', { reply_markup: adminKeyboard });
+      } else if (text === '🔍 بحث عن لاعب') {
+        awaitingSearch.add(adminId);
+        adminBot.sendMessage(chatId, '🔍 أرسل ID اللاعب (أرقام فقط):');
+      } else if (text === '📊 إحصائيات') {
+        awaitingSearch.delete(adminId);
+        const snap = await get(ref(db, 'users'));
+        const users = snap.exists() ? Object.values(snap.val()) : [];
+        let bal = 0, dep = 0, wd = 0;
+        users.forEach(u => { bal += u.balance || 0; dep += u.totalDeposits || 0; wd += u.totalWithdrawals || 0; });
+        adminBot.sendMessage(chatId,
+          `📊 الإحصائيات\n\n` +
+          `👥 عدد اللاعبين: ${fmt(users.length)}\n` +
+          `💰 مجموع الأرصدة: ${fmt(bal)} NSP\n` +
+          `📥 مجموع الإيداعات: ${fmt(dep)}\n` +
+          `📤 مجموع السحوبات: ${fmt(wd)}`);
+      } else if (text === '👥 اللاعبون') {
+        awaitingSearch.delete(adminId);
+        const snap = await get(ref(db, 'users'));
+        if (!snap.exists()) { adminBot.sendMessage(chatId, 'ما في لاعبين بعد.'); return; }
+        const list = Object.entries(snap.val())
+          .map(([id, u]) => ({ id, name: u.name || '-', balance: u.balance || 0 }))
+          .sort((a, b) => b.balance - a.balance)
+          .slice(0, 20);
+        const lines = list.map((u, i) => `${i + 1}. ${u.name} | ${u.id} | ${fmt(u.balance)} NSP`);
+        adminBot.sendMessage(chatId, `👥 أعلى 20 رصيد:\n\n${lines.join('\n')}`);
+      } else if (awaitingSearch.has(adminId)) {
+        awaitingSearch.delete(adminId);
+        const id = text.trim();
+        if (!/^\d+$/.test(id)) { adminBot.sendMessage(chatId, '❌ ID غير صالح.'); return; }
+        const snap = await get(ref(db, `users/${id}`));
+        if (!snap.exists()) { adminBot.sendMessage(chatId, '❌ ما لقيت هالـ ID.'); return; }
+        const u = snap.val();
+        adminBot.sendMessage(chatId,
+          `👤 ${u.name || '-'}\n🆔 ${id}\n\n` +
+          `💰 الرصيد: ${fmt(u.balance)} NSP\n` +
+          `📥 إيداعات: ${fmt(u.totalDeposits)}\n` +
+          `📤 سحوبات: ${fmt(u.totalWithdrawals)}\n` +
+          `🎰 لفات: ${fmt(u.totalSpins)} | 🏆 ربح: ${fmt(u.totalWins)}\n` +
+          `📅 التسجيل: ${u.createdAt ? new Date(u.createdAt).toLocaleDateString('ar') : '-'}`);
+      }
+    } catch (e) {
+      adminBot.sendMessage(chatId, `❌ خطأ بالقراءة: ${e.message}`);
+    }
   });
   console.log('🛡️ بوت الإدارة شغال');
 }
