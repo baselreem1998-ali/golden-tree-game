@@ -112,21 +112,7 @@ bot.on('message', async (msg) => {
       break;
 
     case '📥 شحن رصيد من البوت':
-      const depositMsg =
-        `💳 *طرق الشحن المتاحة:*\n\n` +
-        `━━━━━━━━━━━━━━━━━━\n` +
-        `📱 *سيرياتل كاش:*\n` +
-        `الرقم: \`00525989\`\n` +
-        `الرقم: \`43833398\`\n\n` +
-        `📱 *شام كاش:*\n` +
-        `الكود: \`afeb9f1352b9d297ab8e553ff5eb01e2\`\n` +
-        `━━━━━━━━━━━━━━━━━━\n\n` +
-        `⚠️ *خطوات الشحن:*\n` +
-        `1️⃣ قم بالتحويل لأحد الأرقام أعلاه\n` +
-        `2️⃣ صوّر إيصال التحويل\n` +
-        `3️⃣ أرسل الصورة للدعم مع ذكر المبلغ\n\n` +
-        `📞 للتواصل: اضغط زر "تواصل مع الدعم"`;
-      bot.sendMessage(chatId, depositMsg, { parse_mode: 'Markdown' });
+      bot.sendMessage(chatId, 'اختر طريقة الشحن:', { reply_markup: getDepositKeyboard() });
       break;
 
     case '📤 سحب رصيد من البوت':
@@ -371,6 +357,52 @@ if (adminToken) {
       adminBot.answerCallbackQuery(query.id, { text: `خطأ: ${e.message}` });
     }
   });
+  // --- تأكيد/رفض طلبات الشحن (إضافة جديدة) ---
+  adminBot.on('callback_query', async (query) => {
+    if (!isAdmin(query.from.id)) return;
+    const m = (query.data || '').match(/^dp(ok|no)_(.+)$/);
+    if (!m) return;
+    const approve = m[1] === 'ok';
+    const key = m[2];
+    const chatId = query.message.chat.id;
+    try {
+      let req = null;
+      const res = await runTransaction(ref(db, `bot_deposits/${key}`), (r) => {
+        if (r === null) return r;
+        if (r.status !== 'pending') return;
+        req = { ...r };
+        r.status = approve ? 'approved' : 'rejected';
+        r.resolvedAt = Date.now();
+        return r;
+      });
+      if (!res.committed || !req) {
+        adminBot.sendMessage(chatId, 'تمت معالجة هذا الطلب مسبقاً.').catch(() => {});
+        return;
+      }
+      if (approve) {
+        const u = await runTransaction(ref(db, `users/${req.userId}`), (x) => {
+          if (x === null) return x;
+          x.botBalance = (x.botBalance || 0) + req.amountNSP;
+          x.totalDeposits = (x.totalDeposits || 0) + req.amountNSP;
+          return x;
+        });
+        const val = u.snapshot.val();
+        if (!val) throw new Error('المستخدم غير موجود، لم يُضَف الرصيد');
+        bot.sendMessage(req.userId,
+          `✅ تم شحن رصيدك بقيمة ${num(req.amountNSP)} NSP\n💰 رصيد محفظة البوت: ${num(val.botBalance)} NSP`).catch(() => {});
+      } else {
+        await set(ref(db, `bot_tx_index/${req.method}_${req.txId}`), null);
+        bot.sendMessage(req.userId,
+          `❌ لم يتم تأكيد عملية الشحن\n\nالرجاء التأكد من رقم العملية والقيمة المرسلة، ربما حدث خلط، ثم أعد المحاولة.`).catch(() => {});
+      }
+      await adminBot.editMessageText(
+        `${query.message.text}\n\n${approve ? '✅ تم التأكيد وأُضيف الرصيد' : '❌ تم الرفض'}`,
+        { chat_id: chatId, message_id: query.message.message_id }
+      );
+    } catch (e) {
+      adminBot.sendMessage(chatId, `❌ خطأ: ${e.message}`).catch(() => {});
+    }
+  });
   console.log('🛡️ بوت الإدارة شغال');
 }
 
@@ -519,6 +551,162 @@ bot.on('message', async (msg) => {
     }
   } catch (e) {
     console.log('withdraw error:', e.message);
+    bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.');
+  }
+});
+
+// ===== نافذة الشحن (إضافة جديدة) =====
+const dpFs = require('fs');
+const dpPath = require('path');
+const SYR_CODES = ['00525989', '43833398'];
+const SHAM_ADDRESS = 'afeb9f1352b9d297ab8e553ff5eb01e2';
+const SHAM_QR_FILE = dpPath.join(__dirname, 'shamcash-qr.jpg');
+const DP_MIN = 200;   // أقل شحنة بالعملة الجديدة
+const DP_RATE = 100;  // 200 = 20,000 NSP
+const DP_METHODS = { syr: 'سيرياتيل كاش', sham: 'شام كاش' };
+const dpState = new Map();
+
+function getDepositKeyboard() {
+  return {
+    inline_keyboard: [
+      [{ text: '📲 سيرياتيل كاش', callback_data: 'dp_syr' }],
+      [{ text: '💳 شام كاش', callback_data: 'dp_sham' }],
+      [{ text: '➡️ الرجوع للقائمة الرئيسية', callback_data: 'back_main' }]
+    ]
+  };
+}
+
+bot.onText(/^\/(cancel|start)/, (msg) => { dpState.delete(msg.from.id); });
+
+bot.on('callback_query', async (query) => {
+  const data = query.data || '';
+  const userId = query.from.id;
+  const chatId = query.message.chat.id;
+  try {
+    if (data === 'dp_syr' || data === 'dp_sham') {
+      dpState.set(userId, { step: 'amount', method: data.slice(3) });
+      bot.sendMessage(chatId,
+        `الحد الأدنى للشحن بهذه الطريقة: ${num(DP_MIN)} ل.س\n\n` +
+        `شحن يدوي - الرجاء قراءة التعليمات بدقة\n\n` +
+        `قم بإدخال المبلغ الذي تريد إرساله بالضبط:`);
+      return;
+    }
+    if (data.startsWith('dpc_')) {
+      const st = dpState.get(userId);
+      if (!st || st.step !== 'code') return;
+      st.code = SYR_CODES[parseInt(data.slice(4), 10)] || 'غير محدد';
+      st.step = 'tx';
+      bot.sendMessage(chatId, 'الآن قم بإدخال رقم العملية المكون من 12 رقم:');
+      return;
+    }
+    if (data === 'dpqr') {
+      if (dpFs.existsSync(SHAM_QR_FILE)) {
+        await bot.sendPhoto(chatId, dpFs.createReadStream(SHAM_QR_FILE), { caption: 'رمز QR لحساب شام كاش' });
+      } else {
+        bot.sendMessage(chatId, `عنوان الحساب:\n<code>${SHAM_ADDRESS}</code>`, { parse_mode: 'HTML' });
+      }
+    }
+  } catch (e) { console.log('deposit cb error:', e.message); }
+});
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  const st = dpState.get(userId);
+  if (!st || !text || text.startsWith('/')) return;
+  if (MAIN_BUTTONS.includes(text)) { dpState.delete(userId); return; }
+  const input = toEn(text.trim());
+
+  try {
+    if (st.step === 'amount') {
+      const amount = parseInt(input, 10);
+      if (!/^\d+$/.test(input) || amount < DP_MIN) {
+        bot.sendMessage(chatId, `❌ المبلغ غير صحيح. الحد الأدنى ${num(DP_MIN)} ل.س، أدخل أرقاماً فقط:`);
+        return;
+      }
+      st.amount = amount;
+      if (st.method === 'syr') {
+        st.step = 'code';
+        bot.sendMessage(chatId,
+          `شحن سيرياتيل كاش - تحويل يدوي\n\n` +
+          `الآن: قم باختيار أحد الأكواد التالية:\n\n` +
+          SYR_CODES.map((c) => `• <code>${c}</code>`).join('\n') +
+          `\n\nثم قم بتحويل المبلغ (${num(amount)} ل.س) إليه.\n` +
+          `بعد القيام بالتحويل، اضغط على زر الكود الذي قمت بالتحويل إليه.\n\n` +
+          `أو اضغط على زر "لم أجد الكود" إذا قمت بالتحويل ولم يكن الكود في القائمة.`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                ...SYR_CODES.map((c, i) => [{ text: `📲 ${c}`, callback_data: `dpc_${i}` }]),
+                [{ text: '🔎 لم أجد الكود', callback_data: 'dpc_x' }]
+              ]
+            }
+          });
+      } else {
+        st.step = 'tx';
+        bot.sendMessage(chatId,
+          `لشحن رصيدك عبر شام كاش، أرسل المبلغ (${num(amount)} ل.س) إلى الحساب أدناه:\n\n` +
+          `<code>${SHAM_ADDRESS}</code>\n\n` +
+          `بعد التحويل، ارسل رقم العملية هنا`,
+          {
+            parse_mode: 'HTML',
+            reply_markup: { inline_keyboard: [[{ text: '📷 إظهار رمز QR للحساب', callback_data: 'dpqr' }]] }
+          });
+      }
+      return;
+    }
+
+    if (st.step === 'tx') {
+      const re = st.method === 'syr' ? /^\d{12}$/ : /^\d{6,15}$/;
+      if (!re.test(input)) {
+        bot.sendMessage(chatId, st.method === 'syr'
+          ? '❌ رقم العملية غير صحيح. أدخل 12 رقماً:'
+          : '❌ رقم العملية غير صحيح. أدخل أرقام العملية فقط:');
+        return;
+      }
+      const reqRef = push(ref(db, 'bot_deposits'));
+      const idxPath = `bot_tx_index/${st.method}_${input}`;
+      const idx = await runTransaction(ref(db, idxPath), (cur) => (cur === null ? reqRef.key : undefined));
+      if (!idx.committed) {
+        dpState.delete(userId);
+        bot.sendMessage(chatId, '❌ رقم العملية هذا مستخدم من قبل.');
+        return;
+      }
+      const nsp = st.amount * DP_RATE;
+      try {
+        await set(reqRef, {
+          userId, name: msg.from.first_name || '', method: st.method, code: st.code || '',
+          txId: input, amount: st.amount, amountNSP: nsp, status: 'pending', createdAt: Date.now()
+        });
+      } catch (e) {
+        await set(ref(db, idxPath), null);
+        dpState.delete(userId);
+        bot.sendMessage(chatId, '❌ تعذّر إرسال الطلب، حاول مرة أخرى.');
+        return;
+      }
+      dpState.delete(userId);
+      bot.sendMessage(chatId,
+        `✅ تم استلام طلب الشحن\n\n💳 ${DP_METHODS[st.method]}\n🧾 رقم العملية: ${input}\n` +
+        `💰 ${num(st.amount)} ل.س (= ${num(nsp)} NSP)\n\nسيتم مراجعته من الإدارة وإضافة الرصيد قريباً.`);
+
+      if (adminSender) {
+        const adminMsg =
+          `📥 طلب شحن جديد\n\n👤 ${msg.from.first_name || '-'} | ${userId}\n` +
+          `💳 ${DP_METHODS[st.method]}${st.code ? `\n🏷️ الكود: ${st.code}` : ''}\n` +
+          `🧾 رقم العملية: ${input}\n💰 ${num(st.amount)} ل.س (= ${num(nsp)} NSP)`;
+        const kb = { inline_keyboard: [[
+          { text: '✅ تأكيد', callback_data: `dpok_${reqRef.key}` },
+          { text: '❌ رفض', callback_data: `dpno_${reqRef.key}` }
+        ]] };
+        for (const adminId of ADMIN_IDS) {
+          adminSender.sendMessage(adminId, adminMsg, { reply_markup: kb }).catch((e) => console.log('admin notify error:', e.message));
+        }
+      }
+    }
+  } catch (e) {
+    console.log('deposit error:', e.message);
     bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.');
   }
 });
