@@ -271,3 +271,12 @@ const server = http.createServer((req, res) => {
   res.end('Bot is running!');
 });
 server.listen(process.env.PORT || 3000);
+// ===== بوت الإدارة (إضافة جديدة) =====
+const adminToken = process.env.ADMIN_BOT_TOKEN;
+if (adminToken) {
+  const adminBot = new TelegramBot(adminToken, { polling: true });
+  adminBot.onText(/\/start/, (msg) => {
+    adminBot.sendMessage(msg.chat.id, `🆔 رقم الـ ID تبعك: ${msg.from.id}`);
+  });
+  console.log('🛡️ بوت الإدارة شغال');
+}
