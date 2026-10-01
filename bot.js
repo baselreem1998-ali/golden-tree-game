@@ -50,6 +50,8 @@ async function getOrCreateUser(userId, userName) {
 function getMainKeyboard() {
   return {
     keyboard: [
+      [{ text: '🆕 إنشاء حساب' }],
+      [{ text: '👤 معلومات حسابي' }],
       [{ text: '🎮 دخول الى الألعاب' }],
       [{ text: '📥 شحن رصيد من البوت' }, { text: '📤 سحب رصيد من البوت' }],
       [{ text: '➕ شحن حساب اللعبة' }, { text: '➖ سحب من حساب اللعبة' }],
@@ -420,7 +422,8 @@ const toEn = (s) => s.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(
 const MAIN_BUTTONS = [
   '🎮 دخول الى الألعاب', '📥 شحن رصيد من البوت', '📤 سحب رصيد من البوت',
   '🎁 إهداء رصيد', '🎟️ كود هدية', '✉️ تواصل مع الدعم',
-  '👥 الإحالات', '🔄 السجل', '🌟 العروض', '➕ شحن حساب اللعبة', '➖ سحب من حساب اللعبة'
+  '👥 الإحالات', '🔄 السجل', '🌟 العروض', '➕ شحن حساب اللعبة', '➖ سحب من حساب اللعبة',
+  '🆕 إنشاء حساب', '👤 معلومات حسابي'
 ];
 
 function getWithdrawKeyboard() {
@@ -820,6 +823,135 @@ bot.on('callback_query', async (query) => {
     gwReply(chatId, dir, r, userId);
   } catch (e) {
     console.log('game wallet error:', e.message);
+    bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.').catch(() => {});
+  }
+});
+
+// ===== إنشاء حساب + معلومات حسابي (إضافة جديدة) =====
+const AC_CREATE_BTN = '🆕 إنشاء حساب';
+const AC_INFO_BTN = '👤 معلومات حسابي';
+const AC_BONUS = 10000; // مكافأة إنشاء الحساب (تنزل بمحفظة البوت)
+const acState = new Map();
+const acEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const AC_TERMS =
+  `🌳 أهلاً بك في Tree of Chronos\n\n` +
+  `لاستخدام البوت يجب الموافقة على الشروط التالية:\n\n` +
+  `📜 الشروط والأحكام\n\n` +
+  `1️⃣ حسابك مسؤوليتك: احتفظ باسم المستخدم وكلمة المرور ولا تشاركهما مع أحد، ولا تستخدم كلمة سر من حساباتك الحقيقية الأخرى.\n\n` +
+  `2️⃣ حساب واحد لكل شخص: إنشاء أكثر من حساب أو أي نشاط احتيالي يعرّض الحسابات للإيقاف وتجميد الرصيد.\n\n` +
+  `3️⃣ الشحن والسحب يدويان: كل طلب تتم مراجعته من الإدارة وقد يستغرق بعض الوقت، فتأكد من رقم العملية والمبلغ قبل الإرسال.\n\n` +
+  `4️⃣ تحتفظ الإدارة بحق رفض أي عملية أو إيقاف أي حساب عند الاشتباه بمخالفة الشروط.\n\n` +
+  `5️⃣ الألعاب للتسلية، وأنت المسؤول عن قرارك باللعب وعن المبالغ التي تشحنها.\n\n` +
+  `6️⃣ قد تتغير هذه الشروط في أي وقت، واستمرارك باستخدام البوت يعني موافقتك عليها.\n\n` +
+  `بضغطك على «${AC_CREATE_BTN}» فأنت توافق على الشروط، وتحصل على مكافأة ترحيبية 🎁`;
+
+async function acShowInfo(chatId, userId) {
+  const snap = await get(ref(db, `users/${userId}`));
+  const u = snap.exists() ? snap.val() : {};
+  if (!u.accountId) {
+    bot.sendMessage(chatId, `❌ ليس لديك حساب بعد.\nاضغط «${AC_CREATE_BTN}» لإنشاء حساب.`);
+    return;
+  }
+  bot.sendMessage(chatId,
+    `👤 <b>معلومات حسابي</b>\n\n` +
+    `معرّف الحساب: <code>${acEsc(u.accountId)}</code>\n` +
+    `معرّف التليغرام: <code>${userId}</code>\n` +
+    `اسم الحساب: <code>${acEsc(u.accountName)}</code>\n` +
+    `كلمة السر: <code>${acEsc(u.password)}</code>\n\n` +
+    `💼 رصيد محفظة البوت: ${num(u.botBalance)} NSP`,
+    { parse_mode: 'HTML' });
+}
+
+// رسالة الترحيب + الشروط لمن ليس لديه حساب
+bot.onText(/^\/start/, async (msg) => {
+  acState.delete(msg.from.id);
+  try {
+    const user = await getOrCreateUser(msg.from.id, msg.from.first_name);
+    if (user.accountId) return;
+    setTimeout(() => { bot.sendMessage(msg.chat.id, AC_TERMS).catch(() => {}); }, 1200);
+  } catch (e) { console.log('terms error:', e.message); }
+});
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  if (!text || text.startsWith('/')) return;
+  try {
+    if (text === AC_INFO_BTN) {
+      acState.delete(userId);
+      await acShowInfo(chatId, userId);
+      return;
+    }
+    if (text === AC_CREATE_BTN) {
+      const snap = await get(ref(db, `users/${userId}`));
+      const u = snap.exists() ? snap.val() : {};
+      if (u.accountId) {
+        acState.delete(userId);
+        bot.sendMessage(chatId, '✅ لديك حساب بالفعل.');
+        await acShowInfo(chatId, userId);
+        return;
+      }
+      acState.set(userId, { step: 'username' });
+      bot.sendMessage(chatId, 'الرجاء إدخال اسم المستخدم الذي تريده:\n(من 3 إلى 20 حرفاً: أحرف وأرقام و _ فقط)');
+      return;
+    }
+
+    const st = acState.get(userId);
+    if (!st) return;
+    if (MAIN_BUTTONS.includes(text)) { acState.delete(userId); return; }
+    const input = text.trim();
+
+    if (st.step === 'username') {
+      if (!/^[A-Za-z0-9_\u0600-\u06FF]{3,20}$/.test(input)) {
+        bot.sendMessage(chatId, '❌ الاسم غير صالح. استخدم من 3 إلى 20 حرفاً (أحرف وأرقام و _ فقط، بدون مسافات):');
+        return;
+      }
+      st.username = input;
+      st.step = 'password';
+      bot.sendMessage(chatId, 'الرجاء إدخال كلمة المرور التي تريدها لحسابك (6 أحرف أو أكثر):');
+      return;
+    }
+
+    if (st.step === 'password') {
+      if (input.length < 6 || input.length > 30 || /\s/.test(input)) {
+        bot.sendMessage(chatId, '❌ كلمة المرور يجب أن تكون من 6 إلى 30 حرفاً بدون مسافات. أعد الإدخال:');
+        return;
+      }
+      bot.deleteMessage(chatId, msg.message_id).catch(() => {});
+      const accountName = `${st.username}_${Math.floor(1000 + Math.random() * 9000)}`;
+      const accountId = Math.floor(100000000 + Math.random() * 900000000);
+      let r = { ok: false };
+      const res = await runTransaction(ref(db, `users/${userId}`), (u) => {
+        r = { ok: false };
+        if (u === null) return u;
+        if (u.accountId) { r = { ok: false, exists: true }; return; }
+        u.accountId = accountId;
+        u.accountName = accountName;
+        u.username = st.username;
+        u.password = input;
+        u.accountCreatedAt = Date.now();
+        u.botBalance = (typeof u.botBalance === 'number' ? u.botBalance : 0) + AC_BONUS;
+        r = { ok: true, wallet: u.botBalance };
+        return u;
+      });
+      acState.delete(userId);
+      if (!res.committed || !r.ok) {
+        bot.sendMessage(chatId, r.exists ? '✅ لديك حساب بالفعل.' : '❌ حدث خطأ، حاول مرة أخرى.');
+        return;
+      }
+      await bot.sendMessage(chatId,
+        `معرّف الحساب: <code>${accountId}</code>\n` +
+        `معرّف التليغرام: <code>${userId}</code>\n` +
+        `اسم الحساب: <code>${acEsc(accountName)}</code>\n` +
+        `كلمة السر: <code>${acEsc(input)}</code>\n` +
+        `✅ تم إنشاء الحساب بنجاح`,
+        { parse_mode: 'HTML' });
+      bot.sendMessage(chatId,
+        `💰 لقد حصلت على مكافأة إنشاء حساب بقيمة ${num(AC_BONUS)} NSP!\nرصيد محفظة البوت الجديد: ${num(r.wallet)} NSP`);
+    }
+  } catch (e) {
+    console.log('account error:', e.message);
     bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.').catch(() => {});
   }
 });
