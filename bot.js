@@ -52,6 +52,7 @@ function getMainKeyboard() {
     keyboard: [
       [{ text: '🎮 دخول الى الألعاب' }],
       [{ text: '📥 شحن رصيد من البوت' }, { text: '📤 سحب رصيد من البوت' }],
+      [{ text: '➕ شحن حساب اللعبة' }, { text: '➖ سحب من حساب اللعبة' }],
       [{ text: '🎁 إهداء رصيد' }, { text: '🎟️ كود هدية' }],
       [{ text: '✉️ تواصل مع الدعم' }, { text: '👥 الإحالات' }],
       [{ text: '🔄 السجل' }, { text: '🌟 العروض' }]
@@ -419,7 +420,7 @@ const toEn = (s) => s.replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(
 const MAIN_BUTTONS = [
   '🎮 دخول الى الألعاب', '📥 شحن رصيد من البوت', '📤 سحب رصيد من البوت',
   '🎁 إهداء رصيد', '🎟️ كود هدية', '✉️ تواصل مع الدعم',
-  '👥 الإحالات', '🔄 السجل', '🌟 العروض'
+  '👥 الإحالات', '🔄 السجل', '🌟 العروض', '➕ شحن حساب اللعبة', '➖ سحب من حساب اللعبة'
 ];
 
 function getWithdrawKeyboard() {
@@ -708,5 +709,117 @@ bot.on('message', async (msg) => {
   } catch (e) {
     console.log('deposit error:', e.message);
     bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.');
+  }
+});
+
+// ===== نقل الرصيد بين محفظة البوت ورصيد اللعبة (إضافة جديدة) =====
+const GW_MIN = 20000; // أقل مبلغ للنقل بالاتجاهين (بالـ NSP)
+const GW_IN_BTN = '➕ شحن حساب اللعبة';
+const GW_OUT_BTN = '➖ سحب من حساب اللعبة';
+const gwState = new Map();
+
+async function gwBalances(userId) {
+  const snap = await get(ref(db, `users/${userId}`));
+  const u = snap.exists() ? snap.val() : {};
+  return {
+    wallet: typeof u.botBalance === 'number' ? u.botBalance : 0,
+    game: typeof u.balance === 'number' ? u.balance : 0
+  };
+}
+
+// نقل ذرّي (transaction واحد): الخصم والإضافة بنفس اللحظة
+async function gwTransfer(userId, dir, amount) {
+  let r = { ok: false, reason: 'err' };
+  const from = dir === 'in' ? 'botBalance' : 'balance';
+  const to = dir === 'in' ? 'balance' : 'botBalance';
+  const res = await runTransaction(ref(db, `users/${userId}`), (u) => {
+    r = { ok: false, reason: 'err' };
+    if (u === null) return u;
+    const have = typeof u[from] === 'number' ? u[from] : 0;
+    const amt = amount === 'all' ? have : amount;
+    if (amt <= 0 || amt > have) { r = { ok: false, reason: 'nobal', have }; return; }
+    if (amt < GW_MIN) { r = { ok: false, reason: 'min', have }; return; }
+    u[from] = have - amt;
+    u[to] = (typeof u[to] === 'number' ? u[to] : 0) + amt;
+    r = { ok: true, amt, wallet: u.botBalance || 0, game: u.balance || 0 };
+    return u;
+  });
+  if (res.committed && r.ok) return r;
+  return r.ok ? { ok: false, reason: 'err' } : r;
+}
+
+function gwReply(chatId, dir, r, userId) {
+  if (r.ok) {
+    gwState.delete(userId);
+    const where = dir === 'in' ? 'إلى رصيد اللعبة' : 'إلى محفظة البوت';
+    bot.sendMessage(chatId,
+      `✅ تم نقل ${num(r.amt)} NSP ${where}\n\n💼 محفظة البوت: ${num(r.wallet)} NSP\n🎮 رصيد اللعبة: ${num(r.game)} NSP`,
+      dir === 'in' ? { reply_markup: getGamesKeyboard() } : undefined);
+  } else if (r.reason === 'nobal') {
+    bot.sendMessage(chatId, `❌ المبلغ أكبر من المتاح (${num(r.have)} NSP). أرسل مبلغاً أصغر:`);
+  } else if (r.reason === 'min') {
+    bot.sendMessage(chatId, `❌ أقل مبلغ للنقل ${num(GW_MIN)} NSP.`);
+  } else {
+    gwState.delete(userId);
+    bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.');
+  }
+}
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const text = msg.text;
+  if (!text || text.startsWith('/')) return;
+  try {
+    if (text === GW_IN_BTN || text === GW_OUT_BTN) {
+      const dir = text === GW_IN_BTN ? 'in' : 'out';
+      const b = await gwBalances(userId);
+      const have = dir === 'in' ? b.wallet : b.game;
+      const head = `💼 محفظة البوت: ${num(b.wallet)} NSP\n🎮 رصيد اللعبة: ${num(b.game)} NSP\n\n`;
+      if (have < GW_MIN) {
+        gwState.delete(userId);
+        bot.sendMessage(chatId, head + (dir === 'in'
+          ? `❌ أقل مبلغ للنقل إلى اللعبة ${num(GW_MIN)} NSP، ومحفظتك أقل من ذلك.`
+          : `❌ أقل مبلغ للسحب من اللعبة ${num(GW_MIN)} NSP، ورصيد اللعبة أقل من ذلك.`));
+        return;
+      }
+      gwState.set(userId, { dir });
+      const ask = dir === 'in'
+        ? `أرسل المبلغ الذي تريد نقله إلى اللعبة (أقل شيء ${num(GW_MIN)}):`
+        : `أرسل المبلغ الذي تريد سحبه من اللعبة إلى محفظة البوت (أقل شيء ${num(GW_MIN)}):`;
+      const btnText = dir === 'in' ? `💯 شحن كامل الرصيد (${num(have)})` : `💯 سحب كامل الرصيد (${num(have)})`;
+      bot.sendMessage(chatId, head + ask + '\n\n⚠️ أغلق اللعبة قبل العملية.', {
+        reply_markup: { inline_keyboard: [[{ text: btnText, callback_data: dir === 'in' ? 'gw_in_all' : 'gw_out_all' }]] }
+      });
+      return;
+    }
+
+    const st = gwState.get(userId);
+    if (!st) return;
+    if (MAIN_BUTTONS.includes(text)) { gwState.delete(userId); return; }
+    const input = toEn(text.trim());
+    if (!/^\d+$/.test(input) || parseInt(input, 10) <= 0) {
+      bot.sendMessage(chatId, '❌ أدخل مبلغاً صحيحاً (أرقام فقط).');
+      return;
+    }
+    const r = await gwTransfer(userId, st.dir, parseInt(input, 10));
+    gwReply(chatId, st.dir, r, userId);
+  } catch (e) {
+    console.log('game wallet error:', e.message);
+    bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.').catch(() => {});
+  }
+});
+
+bot.on('callback_query', async (query) => {
+  if (query.data !== 'gw_in_all' && query.data !== 'gw_out_all') return;
+  const userId = query.from.id;
+  const chatId = query.message.chat.id;
+  const dir = query.data === 'gw_in_all' ? 'in' : 'out';
+  try {
+    const r = await gwTransfer(userId, dir, 'all');
+    gwReply(chatId, dir, r, userId);
+  } catch (e) {
+    console.log('game wallet error:', e.message);
+    bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.').catch(() => {});
   }
 });
