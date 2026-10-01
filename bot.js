@@ -469,7 +469,6 @@ bot.on('message', async (msg) => {
         if (u === null) return u;
         const bal = typeof u.balance === 'number' ? u.balance : 0;
         before = bal;
-        if (!(u.totalDeposits > 0)) { reason = 'nodep'; return; }
         if (bal < amount) { reason = 'nobal'; return; }
         u.balance = bal - amount;
         return u;
