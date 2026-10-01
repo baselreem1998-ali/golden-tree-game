@@ -50,16 +50,10 @@ async function getOrCreateUser(userId, userName) {
 function getMainKeyboard() {
   return {
     keyboard: [
-      [{ text: '🆕 إنشاء حساب' }],
-      [{ text: '👤 معلومات حسابي' }],
-      [{ text: '🎮 دخول الى الألعاب' }],
-      [{ text: '📥 شحن رصيد من البوت' }, { text: '📤 سحب رصيد من البوت' }],
-      [{ text: '➕ شحن حساب اللعبة' }, { text: '➖ سحب من حساب اللعبة' }],
-      [{ text: '🎁 إهداء رصيد' }, { text: '🎟️ كود هدية' }],
-      [{ text: '✉️ تواصل مع الدعم' }, { text: '👥 الإحالات' }],
-      [{ text: '🔄 السجل' }, { text: '🌟 العروض' }]
+      [{ text: '🚀 ستارت' }]
     ],
     resize_keyboard: true,
+    is_persistent: true,
     one_time_keyboard: false
   };
 }
@@ -84,7 +78,7 @@ bot.onText(/\/start/, async (msg) => {
   const welcomeMsg =
     `🌳 *مرحباً ${userName}!*\n\n` +
     `أهلاً بك في بوت الشجرة الذهبية 🎰\n\n` +
-    `💰 رصيدك: *${user.balance}* NSP\n\n` +
+    `💰 رصيدك: *${user.botBalance || 0}* NSP\n\n` +
     `استخدم الأزرار أدناه للتنقل:`;
 
   bot.sendMessage(chatId, welcomeMsg, {
@@ -108,7 +102,7 @@ bot.on('message', async (msg) => {
       bot.sendMessage(
         chatId,
         `🎰 *قسم الألعاب*\n\n` +
-        `💰 رصيدك: *${user.balance}* NSP\n\n` +
+        `💰 رصيدك: *${user.botBalance || 0}* NSP\n\n` +
         `اضغطي "لعب الآن" وابدئي مباشرة:`,
         { parse_mode: 'Markdown', reply_markup: getGamesKeyboard() }
       );
@@ -126,7 +120,7 @@ bot.on('message', async (msg) => {
       bot.sendMessage(
         chatId,
         `🎁 *إهداء رصيد لمستخدم آخر*\n\n` +
-        `💰 رصيدك: *${user.balance}* NSP\n\n` +
+        `💰 رصيدك: *${user.botBalance || 0}* NSP\n\n` +
         `لإهداء رصيد، أرسل:\n` +
         `\`/gift [user_id] [amount]\`\n\n` +
         `مثال: \`/gift 123456789 100\``,
@@ -175,7 +169,7 @@ bot.on('message', async (msg) => {
         `🔄 *سجل العمليات*\n\n` +
         `💰 إجمالي الإيداعات: ${user.totalDeposits || 0}\n` +
         `💸 إجمالي السحوبات: ${user.totalWithdrawals || 0}\n` +
-        `💰 رصيدك الحالي: ${user.balance || 0}\n\n` +
+        `💰 رصيدك الحالي: ${user.botBalance || 0}\n\n` +
         `📅 تاريخ التسجيل: ${new Date(user.createdAt).toLocaleDateString('ar')}`
       );
       break;
@@ -201,7 +195,7 @@ bot.on('callback_query', async (query) => {
 
   switch (data) {
     case 'back_main':
-      bot.sendMessage(chatId, '🏠 القائمة الرئيسية:', { reply_markup: getMainKeyboard() });
+      bot.sendMessage(chatId, '🏠 القائمة الرئيسية:', { reply_markup: getMainMenu() });
       break;
   }
   bot.answerCallbackQuery(query.id);
@@ -215,7 +209,7 @@ bot.onText(/\/gift (\d+) (\d+)/, async (msg, match) => {
   const amount = parseInt(match[2]);
   const user = await getOrCreateUser(userId, msg.from.first_name);
 
-  if (amount > user.balance) {
+  if (amount > (user.botBalance || 0)) {
     bot.sendMessage(chatId, '❌ رصيدك غير كافٍ');
     return;
   }
@@ -224,8 +218,8 @@ bot.onText(/\/gift (\d+) (\d+)/, async (msg, match) => {
   const senderRef = ref(db, `users/${userId}`);
   const targetRef = ref(db, `users/${targetId}`);
 
-  await update(senderRef, { balance: user.balance - amount });
-  await update(targetRef, { balance: targetUser.balance + amount });
+  await update(senderRef, { botBalance: (user.botBalance || 0) - amount });
+  await update(targetRef, { botBalance: (targetUser.botBalance || 0) + amount });
 
   bot.sendMessage(chatId, `✅ تم إرسال ${amount} NSP بنجاح!`);
   bot.sendMessage(targetId, `🎁 تلقيت ${amount} NSP من مستخدم!`);
@@ -423,7 +417,7 @@ const MAIN_BUTTONS = [
   '🎮 دخول الى الألعاب', '📥 شحن رصيد من البوت', '📤 سحب رصيد من البوت',
   '🎁 إهداء رصيد', '🎟️ كود هدية', '✉️ تواصل مع الدعم',
   '👥 الإحالات', '🔄 السجل', '🌟 العروض', '➕ شحن حساب اللعبة', '➖ سحب من حساب اللعبة',
-  '🆕 إنشاء حساب', '👤 معلومات حسابي'
+  '🆕 إنشاء حساب', '👤 معلومات حسابي', '🚀 ستارت'
 ];
 
 function getWithdrawKeyboard() {
@@ -954,4 +948,51 @@ bot.on('message', async (msg) => {
     console.log('account error:', e.message);
     bot.sendMessage(chatId, '❌ حدث خطأ، حاول مرة أخرى.').catch(() => {});
   }
+});
+
+// ===== القائمة الرئيسية (inline) + زر ستارت الثابت (إضافة جديدة) =====
+const MENU_START_BTN = '🚀 ستارت';
+const MENU_ITEMS = [
+  '🆕 إنشاء حساب', '👤 معلومات حسابي', '🎮 دخول الى الألعاب',
+  '📥 شحن رصيد من البوت', '📤 سحب رصيد من البوت',
+  '➕ شحن حساب اللعبة', '➖ سحب من حساب اللعبة',
+  '🎁 إهداء رصيد', '🎟️ كود هدية',
+  '✉️ تواصل مع الدعم', '👥 الإحالات',
+  '🔄 السجل', '🌟 العروض'
+];
+
+function getMainMenu() {
+  const rows = [[0], [1], [2], [3, 4], [5, 6], [7, 8], [9, 10], [11, 12]];
+  return {
+    inline_keyboard: rows.map((r) => r.map((i) => ({ text: MENU_ITEMS[i], callback_data: `mn_${i}` })))
+  };
+}
+
+// بعد /start: القائمة الرئيسية (بعد رسالة الترحيب والشروط)
+bot.onText(/^\/start/, (msg) => {
+  gwState.delete(msg.from.id);
+  setTimeout(() => {
+    bot.sendMessage(msg.chat.id, '🏠 القائمة الرئيسية:', { reply_markup: getMainMenu() }).catch(() => {});
+  }, 2000);
+});
+
+// زر ستارت الثابت
+bot.on('message', (msg) => {
+  if (msg.text !== MENU_START_BTN) return;
+  bot.sendMessage(msg.chat.id, '🏠 القائمة الرئيسية:', { reply_markup: getMainMenu() }).catch(() => {});
+});
+
+// ضغطة زر من القائمة = نفس ضغط الزر النصي القديم (نفس المعالجات بدون تغيير)
+bot.on('callback_query', (query) => {
+  const m = /^mn_(\d+)$/.exec(query.data || '');
+  if (!m || !query.message) return;
+  const text = MENU_ITEMS[parseInt(m[1], 10)];
+  if (!text) return;
+  bot.emit('message', {
+    message_id: query.message.message_id,
+    from: query.from,
+    chat: query.message.chat,
+    date: Math.floor(Date.now() / 1000),
+    text
+  });
 });
