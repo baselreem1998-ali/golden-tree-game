@@ -407,7 +407,7 @@
 <!-- ===== نافذة استقبال اللاعبين (شخصية متحركة) ===== -->
 <div id="introOverlay">
   <div class="intro-char-wrap">
-    <img class="intro-char walk-in bob" id="introImg" src="intro-walk-a.png" alt="" onerror="this.style.opacity='0'">
+    <img class="intro-char walk-in bob" id="introImg" src="intro-walk-a.jpg" alt="" onerror="this.style.opacity='0'">
   </div>
   <div class="intro-welcome" id="introWelcome">WELCOME TO OUR GAMES</div>
   <button id="introSkip" onclick="skipIntro()">تخطي ⏭</button>
@@ -496,9 +496,15 @@ document.getElementById('lobbyUserInfo').textContent = `مرحباً ${userName}
    نافذة استقبال اللاعبين — مشهد الشخصية المتحركة (٥ ثواني)
    ===================================================================== */
 let introDone = false;
+document.addEventListener('pointerdown', function unlockAudioOnce(){
+  const ctx = introSound._ctx;
+  if(ctx && ctx.state === 'suspended') ctx.resume().catch(()=>{});
+  document.removeEventListener('pointerdown', unlockAudioOnce);
+}, { once:true });
 function introSound(kind){
   try{
     const ctx = introSound._ctx || (introSound._ctx = new (window.AudioContext||window.webkitAudioContext)());
+    if(ctx.state === 'suspended') ctx.resume().catch(()=>{});
     const t0 = ctx.currentTime;
     if(kind==='step'){
       const o=ctx.createOscillator(), g=ctx.createGain();
@@ -559,26 +565,26 @@ function playIntro(){
 
   /* المشي: ٠ - ٢٢٠٠ مل.ث */
   const stepSound = setInterval(()=>introSound('step'), 400);
-  setTimeout(()=>{ img.src = 'intro-walk-b.png'; }, 400);
-  setTimeout(()=>{ img.src = 'intro-walk-a.png'; }, 800);
-  setTimeout(()=>{ img.src = 'intro-walk-b.png'; }, 1200);
-  setTimeout(()=>{ img.src = 'intro-walk-a.png'; }, 1600);
-  setTimeout(()=>{ img.src = 'intro-walk-b.png'; }, 2000);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 400);
+  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 800);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 1200);
+  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 1600);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 2000);
 
   /* الاستعداد: ٢٢٠٠ - ٢٨٠٠ */
   setTimeout(()=>{
     clearInterval(stepSound);
     img.classList.remove('walk-in','bob');
-    img.src = 'intro-ready.png';
+    img.src = 'intro-ready.jpg';
   }, 2200);
 
   /* الرفع: ٢٨٠٠ - ٣٤٠٠ */
-  setTimeout(()=>{ img.src = 'intro-raise.png'; }, 2800);
+  setTimeout(()=>{ img.src = 'intro-raise.jpg'; }, 2800);
 
   /* الضربة: ٣٤٠٠ */
   setTimeout(()=>{
     if(introDone) return;
-    img.src = 'intro-slam.png';
+    img.src = 'intro-slam.jpg';
     img.classList.add('impact-pose');
     overlay.classList.add('intro-shake');
     document.getElementById('introFlash').classList.add('on');
