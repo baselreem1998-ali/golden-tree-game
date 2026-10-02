@@ -338,7 +338,7 @@
     transform:translateX(120vw);
   }
   .intro-char.walk-in{
-    animation:introWalkIn 2.2s cubic-bezier(.4,.05,.3,1) forwards;
+    animation:introWalkIn 20s cubic-bezier(.4,.05,.3,1) forwards;
   }
   @keyframes introWalkIn{
     0%{ transform:translateX(120vw) translateY(0); }
@@ -563,25 +563,26 @@ function playIntro(){
   const img = document.getElementById('introImg');
   if(!overlay || !img){ revealLobby(); return; }
 
-  /* المشي: ٠ - ٢٢٠٠ مل.ث */
-  const stepSound = setInterval(()=>introSound('step'), 400);
-  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 400);
-  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 800);
-  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 1200);
-  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 1600);
-  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 2000);
+  /* === نسخة تشخيص مؤقتة: كل مرحلة ممدودة ~10x (إجمالي ~50 ثانية) === */
+  /* المشي: ٠ - ٢٠٠٠٠ مل.ث */
+  const stepSound = setInterval(()=>introSound('step'), 4000);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 4000);
+  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 8000);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 12000);
+  setTimeout(()=>{ img.src = 'intro-walk-a.jpg'; }, 16000);
+  setTimeout(()=>{ img.src = 'intro-walk-b.jpg'; }, 20000);
 
-  /* الاستعداد: ٢٢٠٠ - ٢٨٠٠ */
+  /* الاستعداد: ٢٢٠٠٠ */
   setTimeout(()=>{
     clearInterval(stepSound);
     img.classList.remove('walk-in','bob');
     img.src = 'intro-ready.jpg';
-  }, 2200);
+  }, 22000);
 
-  /* الرفع: ٢٨٠٠ - ٣٤٠٠ */
-  setTimeout(()=>{ img.src = 'intro-raise.jpg'; }, 2800);
+  /* الرفع: ٣٠٠٠٠ */
+  setTimeout(()=>{ img.src = 'intro-raise.jpg'; }, 30000);
 
-  /* الضربة: ٣٤٠٠ */
+  /* الضربة: ٣٨٠٠٠ */
   setTimeout(()=>{
     if(introDone) return;
     img.src = 'intro-slam.jpg';
@@ -592,15 +593,15 @@ function playIntro(){
     introSound('slam');
     setTimeout(()=>introSound('laugh'), 150);
     if(navigator.vibrate) navigator.vibrate([120,40,180]);
-  }, 3400);
+  }, 38000);
 
-  /* ترحيب بالإنجليزي: ٣٦٠٠ */
+  /* ترحيب بالإنجليزي: ٤٠٠٠٠ */
   setTimeout(()=>{
     document.getElementById('introWelcome').classList.add('show');
-  }, 3600);
+  }, 40000);
 
-  /* نهاية المشهد والتلاشي: ٤٦٠٠ -> ٥٠٠٠ */
-  setTimeout(()=>{ finishIntro(); }, 4600);
+  /* نهاية المشهد والتلاشي: ٥٠٠٠٠ */
+  setTimeout(()=>{ finishIntro(); }, 50000);
 }
 function finishIntro(){
   if(introDone) return;
